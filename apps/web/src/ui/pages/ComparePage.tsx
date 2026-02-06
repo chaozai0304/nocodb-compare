@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type Key } from 'react'
 import { Button, Card, Col, Divider, Form, Input, Row, Select, Space, Switch, Table, Typography, message } from 'antd'
 import { fetchJson } from '../api'
 import type { Plan, PlanStep } from '../types'
+import { useTranslation } from 'react-i18next'
 
 type Diff = any
 
@@ -12,6 +13,7 @@ type FullConfig = {
 }
 
 export function ComparePage() {
+  const { t } = useTranslation()
   const [form] = Form.useForm()
   const [plan, setPlan] = useState<Plan | null>(null)
   const [diff, setDiff] = useState<Diff | null>(null)
@@ -47,7 +49,7 @@ export function ComparePage() {
           source: { apiVersion: 'v2' },
           target: { apiVersion: 'v2' },
         })
-        message.warning('后端未响应：已加载默认配置（请确认 server 已启动）')
+        message.warning(t('compare.serverNotResponding'))
       }
     })()
   }, [form])
@@ -83,7 +85,7 @@ export function ComparePage() {
       body: JSON.stringify(v),
     })
 
-    message.success('配置已保存到本地 data/config.json')
+    message.success(t('compare.configSaved'))
   }
 
   async function compare() {
@@ -93,7 +95,7 @@ export function ComparePage() {
       await saveConfig()
 
       const data = await runCompareWithValues(v)
-      message.success(`对比完成：生成 ${data.plan?.steps?.length ?? 0} 个步骤`)
+      message.success(t('compare.compareDone', { count: data.plan?.steps?.length ?? 0 }))
     } catch (e: any) {
       message.error(e?.message ?? String(e))
     } finally {
@@ -117,13 +119,13 @@ export function ComparePage() {
         }),
       })
 
-      if (data.ok) message.success(dryRun ? 'Dry-run 通过（未实际执行）' : '执行完成')
-      else message.warning('执行结束，但有失败步骤，请查看结果')
+      if (data.ok) message.success(dryRun ? t('compare.applyOkDryRun') : t('compare.applyOk'))
+      else message.warning(t('compare.applyHasFailures'))
 
       const failed = (data.results || []).filter((r: any) => !r.ok)
       if (failed.length) {
         console.error('failed steps', failed)
-        message.error(`失败 ${failed.length} 个步骤（详情见控制台）`)
+        message.error(t('compare.failedCount', { count: failed.length }))
       }
 
       // 执行后自动重新对比，刷新 diff/plan。
@@ -131,7 +133,7 @@ export function ComparePage() {
         setLoadingCompare(true)
         try {
           const next = await runCompareWithValues(v)
-          message.info(`已自动重新对比：当前剩余 ${next.plan?.steps?.length ?? 0} 个步骤`)
+          message.info(t('compare.reCompareDone', { count: next.plan?.steps?.length ?? 0 }))
         } finally {
           setLoadingCompare(false)
         }
@@ -172,28 +174,28 @@ export function ComparePage() {
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Card size="small" style={{ borderRadius: 8 }}>
         <Typography.Title level={3} style={{ marginTop: 0, marginBottom: 4 }}>
-          对比升级
+          {t('compare.title')}
         </Typography.Title>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          配置 source/target 后点击“开始对比”，生成可勾选的升级步骤；可 Dry-run 验证，也可直接执行。
+          {t('compare.subtitle')}
         </Typography.Paragraph>
       </Card>
 
-      <Card title="环境配置" size="small" style={{ borderRadius: 8 }}>
+      <Card title={t('compare.envConfig')} size="small" style={{ borderRadius: 8 }}>
         <Form form={form} layout="vertical">
           <Row gutter={12}>
             <Col span={12}>
-              <Card title="Source（正式环境）" size="small" style={{ borderRadius: 8 }}>
-                <Form.Item name={['source', 'apiVersion']} label="API 版本" initialValue="v2">
+              <Card title={t('compare.source')} size="small" style={{ borderRadius: 8 }}>
+                <Form.Item name={['source', 'apiVersion']} label={t('compare.apiVersion')} initialValue="v2">
                   <Select options={[{ value: 'v2' }, { value: 'v3' }]} />
                 </Form.Item>
-                <Form.Item name={['source', 'baseUrl']} label="Base URL" rules={[{ required: true }]}
+                <Form.Item name={['source', 'baseUrl']} label={t('compare.baseUrl')} rules={[{ required: true, message: t('validation.required') }]}
                 >
                   <Input placeholder="https://nocodb.company.com" />
                 </Form.Item>
                 <Form.Item
                   name={['source', 'apiToken']}
-                  label="API Token"
+                  label={t('compare.apiToken')}
                   dependencies={[["source", "apiTokenSaved"]]}
                   rules={[
                     {
@@ -201,34 +203,38 @@ export function ComparePage() {
                         const saved = !!form.getFieldValue(['source', 'apiTokenSaved'])
                         if (saved && !String(value ?? '').trim()) return
                         if (String(value ?? '').trim()) return
-                        throw new Error('API Token 必填')
+                        throw new Error(t('validation.apiTokenRequired'))
                       },
                     },
                   ]}
                 >
                   <Input.Password
-                    placeholder={form.getFieldValue(['source', 'apiTokenSaved']) ? '已保存（不回显）' : 'xc-auth token'}
+                    placeholder={
+                      form.getFieldValue(['source', 'apiTokenSaved'])
+                        ? t('compare.apiTokenSaved')
+                        : t('compare.apiTokenPlaceholder')
+                    }
                   />
                 </Form.Item>
-                <Form.Item name={['source', 'baseId']} label="Base ID" rules={[{ required: true }]}
+                <Form.Item name={['source', 'baseId']} label={t('compare.baseId')} rules={[{ required: true, message: t('validation.required') }]}
                 >
-                  <Input placeholder="例如 pRdVnZXPZgA" />
+                  <Input placeholder={t('compare.baseIdPlaceholder')} />
                 </Form.Item>
               </Card>
             </Col>
 
             <Col span={12}>
-              <Card title="Target（待升级环境）" size="small" style={{ borderRadius: 8 }}>
-                <Form.Item name={['target', 'apiVersion']} label="API 版本" initialValue="v2">
+              <Card title={t('compare.target')} size="small" style={{ borderRadius: 8 }}>
+                <Form.Item name={['target', 'apiVersion']} label={t('compare.apiVersion')} initialValue="v2">
                   <Select options={[{ value: 'v2' }, { value: 'v3' }]} />
                 </Form.Item>
-                <Form.Item name={['target', 'baseUrl']} label="Base URL" rules={[{ required: true }]}
+                <Form.Item name={['target', 'baseUrl']} label={t('compare.baseUrl')} rules={[{ required: true, message: t('validation.required') }]}
                 >
                   <Input placeholder="https://nocodb-staging.company.com" />
                 </Form.Item>
                 <Form.Item
                   name={['target', 'apiToken']}
-                  label="API Token"
+                  label={t('compare.apiToken')}
                   dependencies={[["target", "apiTokenSaved"]]}
                   rules={[
                     {
@@ -236,18 +242,22 @@ export function ComparePage() {
                         const saved = !!form.getFieldValue(['target', 'apiTokenSaved'])
                         if (saved && !String(value ?? '').trim()) return
                         if (String(value ?? '').trim()) return
-                        throw new Error('API Token 必填')
+                        throw new Error(t('validation.apiTokenRequired'))
                       },
                     },
                   ]}
                 >
                   <Input.Password
-                    placeholder={form.getFieldValue(['target', 'apiTokenSaved']) ? '已保存（不回显）' : 'xc-auth token'}
+                    placeholder={
+                      form.getFieldValue(['target', 'apiTokenSaved'])
+                        ? t('compare.apiTokenSaved')
+                        : t('compare.apiTokenPlaceholder')
+                    }
                   />
                 </Form.Item>
-                <Form.Item name={['target', 'baseId']} label="Base ID" rules={[{ required: true }]}
+                <Form.Item name={['target', 'baseId']} label={t('compare.baseId')} rules={[{ required: true, message: t('validation.required') }]}
                 >
-                  <Input placeholder="例如 pRdVnZXPZgA" />
+                  <Input placeholder={t('compare.baseIdPlaceholder')} />
                 </Form.Item>
               </Card>
             </Col>
@@ -257,26 +267,26 @@ export function ComparePage() {
 
           <Row gutter={12}>
             <Col span={8}>
-              <Form.Item name={['options', 'ignoreCase']} label="标题忽略大小写" valuePropName="checked" initialValue={true}>
+              <Form.Item name={['options', 'ignoreCase']} label={t('compare.optionsIgnoreCase')} valuePropName="checked" initialValue={true}>
                 <Switch />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name={['options', 'includeSystemColumns']} label="包含系统字段" valuePropName="checked" initialValue={false}>
+              <Form.Item name={['options', 'includeSystemColumns']} label={t('compare.optionsIncludeSystem')} valuePropName="checked" initialValue={false}>
                 <Switch />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name={['options', 'includeDeleteOps']} label="包含删除操作(危险)" valuePropName="checked" initialValue={false}>
+              <Form.Item name={['options', 'includeDeleteOps']} label={t('compare.optionsIncludeDelete')} valuePropName="checked" initialValue={false}>
                 <Switch />
               </Form.Item>
             </Col>
           </Row>
 
           <Space>
-            <Button onClick={saveConfig}>保存配置</Button>
+            <Button onClick={saveConfig}>{t('common.saveConfig')}</Button>
             <Button type="primary" loading={loadingCompare} onClick={compare}>
-              开始对比
+              {t('common.startCompare')}
             </Button>
           </Space>
         </Form>
@@ -285,16 +295,16 @@ export function ComparePage() {
       <Card
         title={
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <span>升级计划（Plan）</span>
+            <span>{t('compare.planTitle')}</span>
             <Space wrap>
               <Button disabled={!plan} onClick={exportJsonl}>
-                导出 JSONL
+                {t('common.exportJsonl')}
               </Button>
               <Button disabled={!plan} loading={loadingApply} onClick={() => apply(true)}>
-                Dry-run
+                {t('common.dryRun')}
               </Button>
               <Button danger disabled={!plan} loading={loadingApply} onClick={() => apply(false)}>
-                执行升级
+                {t('common.apply')}
               </Button>
             </Space>
           </div>
@@ -311,24 +321,24 @@ export function ComparePage() {
           }}
           columns={[
             {
-              title: '危险',
+              title: t('common.danger'),
               dataIndex: 'danger',
               width: 70,
-              render: (v: boolean) => (v ? '是' : ''),
+              render: (v: boolean) => (v ? t('common.yes') : ''),
             },
-            { title: '步骤', dataIndex: 'title' },
-            { title: 'Method', dataIndex: ['request', 'method'], width: 90 },
-            { title: 'URL', dataIndex: ['request', 'url'] },
+            { title: t('common.step'), dataIndex: 'title' },
+            { title: t('common.method'), dataIndex: ['request', 'method'], width: 90 },
+            { title: t('common.url'), dataIndex: ['request', 'url'] },
           ]}
           pagination={{ pageSize: 20 }}
         />
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          说明：表/字段的 add/update/delete 会转成 target 环境的 NocoDB Meta API 调用。删除操作建议先导出 JSONL 并人工复核。
+          {t('compare.planNote')}
         </Typography.Paragraph>
       </Card>
 
-      <Card title="差异摘要（Diff）" size="small" style={{ borderRadius: 8 }}>
-        <pre style={{ whiteSpace: 'pre-wrap', margin: 0, maxHeight: 260, overflow: 'auto' }}>{diff ? JSON.stringify(diff, null, 2) : '尚未对比'}</pre>
+      <Card title={t('compare.diffTitle')} size="small" style={{ borderRadius: 8 }}>
+        <pre style={{ whiteSpace: 'pre-wrap', margin: 0, maxHeight: 260, overflow: 'auto' }}>{diff ? JSON.stringify(diff, null, 2) : t('compare.notCompared')}</pre>
       </Card>
     </Space>
   )

@@ -18,14 +18,25 @@ import {
 import type { UploadProps } from 'antd'
 import type { ApplyResult, Plan, PlanStep } from '../types'
 import { fetchJson } from '../api'
+import { useTranslation } from 'react-i18next'
 
 type FullConfig = {
   target?: any
 }
 
-function parsePlanFileText(text: string): { plan?: Plan; error?: string } {
+type ParsePlanResult =
+  | { plan: Plan }
+  | {
+      errorKey:
+        | 'import.errors.emptyFile'
+        | 'import.errors.invalidJsonlLine'
+        | 'import.errors.unrecognizedFormat'
+      errorParams?: Record<string, any>
+    }
+
+function parsePlanFileText(text: string): ParsePlanResult {
   const trimmed = (text ?? '').trim()
-  if (!trimmed) return { error: '文件内容为空' }
+  if (!trimmed) return { errorKey: 'import.errors.emptyFile' }
 
   // 1) JSON（Plan 对象 / steps 数组）
   try {
@@ -53,18 +64,25 @@ function parsePlanFileText(text: string): { plan?: Plan; error?: string } {
       .map((l) => l.trim())
       .filter(Boolean)
 
-    const steps: PlanStep[] = lines.map((l, idx) => {
+    const steps: PlanStep[] = []
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i]
       try {
-        return JSON.parse(l) as PlanStep
+        steps.push(JSON.parse(l) as PlanStep)
       } catch (e: any) {
-        throw new Error(`第 ${idx + 1} 行不是合法 JSON：${e?.message ?? String(e)}`)
+        return {
+          errorKey: 'import.errors.invalidJsonlLine',
+          errorParams: { line: i + 1, error: e?.message ?? String(e) },
+        }
       }
-    })
+    }
 
     return { plan: { createdAt: new Date().toISOString(), steps } }
-  } catch (e: any) {
-    return { error: e?.message ?? String(e) }
+  } catch {
+    // ignore
   }
+
+  return { errorKey: 'import.errors.unrecognizedFormat' }
 }
 
 function normalizeImportedPlan(p: Plan): Plan {
@@ -98,6 +116,7 @@ function normalizeImportedPlan(p: Plan): Plan {
 }
 
 export function ImportExecutePage() {
+  const { t } = useTranslation()
   const [form] = Form.useForm()
 
   const [plan, setPlan] = useState<Plan | null>(null)
@@ -137,22 +156,23 @@ export function ImportExecutePage() {
         setFileName(file.name)
 
         const parsed = parsePlanFileText(text)
-        if (parsed.error) {
+        if ('errorKey' in parsed) {
           setPlan(null)
           setSelectedStepIds([])
-          setParseError(parsed.error)
-          message.error(`解析失败：${parsed.error}`)
+          const err = t(parsed.errorKey, parsed.errorParams)
+          setParseError(err)
+          message.error(t('import.parseFailed', { error: err }))
           return false
         }
 
-        const normalized = normalizeImportedPlan(parsed.plan!)
+        const normalized = normalizeImportedPlan(parsed.plan)
 
         // 基础校验：必须有 url
         const bad = normalized.steps.find((s) => !s.request?.url)
         if (bad) {
           setPlan(null)
           setSelectedStepIds([])
-          const msg = `步骤 ${bad.id} 缺少 request.url，无法执行（请确认导出文件来自本工具）`
+          const msg = t('import.missingUrl', { id: bad.id })
           setParseError(msg)
           message.error(msg)
           return false
@@ -167,16 +187,16 @@ export function ImportExecutePage() {
 
         const dangerCount = normalized.steps.filter((s) => !!s.danger).length
         if (dangerCount) {
-          message.warning(`已导入：${normalized.steps.length} 个步骤（已默认勾选安全项；危险步骤 ${dangerCount} 个需手动勾选）`)
+          message.warning(t('import.importedSafeDefault', { total: normalized.steps.length, danger: dangerCount }))
         } else {
-          message.success(`已导入：${normalized.steps.length} 个步骤`)
+          message.success(t('import.imported', { total: normalized.steps.length }))
         }
       } catch (e: any) {
         const msg = e?.message ?? String(e)
         setParseError(msg)
         setPlan(null)
         setSelectedStepIds([])
-        message.error(`读取失败：${msg}`)
+        message.error(t('import.readFailed', { error: msg }))
       }
       return false
     },
@@ -224,9 +244,14 @@ export function ImportExecutePage() {
 
       const failed = (data.results || []).filter((r) => !r.ok)
       if (data.ok) {
-        message.success(dryRun ? 'Dry-run 通过（未实际执行）' : '执行完成')
+        message.success(dryRun ? t('import.dryRunOk') : t('import.applyOk'))
       } else {
-        message.warning(`执行结束：成功 ${(data.results?.length ?? 0) - failed.length}，失败 ${failed.length}`)
+        message.warning(
+          t('import.applySummary', {
+            ok: (data.results?.length ?? 0) - failed.length,
+            failed: failed.length,
+          }),
+        )
       }
     } catch (e: any) {
       message.error(e?.message ?? String(e))
@@ -239,44 +264,44 @@ export function ImportExecutePage() {
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Card size="small" style={{ borderRadius: 8 }}>
         <Typography.Title level={3} style={{ marginTop: 0, marginBottom: 4 }}>
-          导入执行
+          {t('import.title')}
         </Typography.Title>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          将“导出 JSONL/JSON”导入后，直接执行到你指定的 target 服务。适合把计划带到另一台执行机或走人工审核流程。
+          {t('import.subtitle')}
         </Typography.Paragraph>
       </Card>
 
-      <Card title="1) 导入计划文件" size="small" style={{ borderRadius: 8 }}>
+      <Card title={t('import.step1')} size="small" style={{ borderRadius: 8 }}>
         <Upload.Dragger {...uploadProps}>
-          <p style={{ margin: 0, fontWeight: 600 }}>拖拽文件到这里，或点击选择</p>
-          <p style={{ margin: '8px 0 0 0', color: 'rgba(0,0,0,0.45)' }}>支持 .json / .jsonl / .txt（JSONL：每行一个步骤）</p>
+          <p style={{ margin: 0, fontWeight: 600 }}>{t('import.dragHint')}</p>
+          <p style={{ margin: '8px 0 0 0', color: 'rgba(0,0,0,0.45)' }}>{t('import.supportHint')}</p>
         </Upload.Dragger>
         <div style={{ marginTop: 8 }}>
-          <Typography.Text type="secondary">当前文件：</Typography.Text>
-          <Typography.Text>{fileName ?? '未选择'}</Typography.Text>
+          <Typography.Text type="secondary">{t('common.selectedFile')}：</Typography.Text>
+          <Typography.Text>{fileName ?? t('common.notSelected')}</Typography.Text>
         </div>
         {parseError ? (
-          <Alert style={{ marginTop: 12 }} type="error" showIcon message="导入失败" description={parseError} />
+          <Alert style={{ marginTop: 12 }} type="error" showIcon message={t('import.importFailed')} description={parseError} />
         ) : null}
       </Card>
 
-      <Card title="2) 目标环境（执行平台）" size="small" style={{ borderRadius: 8 }}>
+      <Card title={t('import.step2')} size="small" style={{ borderRadius: 8 }}>
         <Form form={form} layout="vertical">
           <Row gutter={12}>
             <Col span={8}>
-              <Form.Item name={['target', 'apiVersion']} label="API 版本" initialValue="v2">
+              <Form.Item name={['target', 'apiVersion']} label={t('compare.apiVersion')} initialValue="v2">
                 <Select options={[{ value: 'v2' }, { value: 'v3' }]} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name={['target', 'baseUrl']} label="Base URL" rules={[{ required: true }]}>
+              <Form.Item name={['target', 'baseUrl']} label={t('compare.baseUrl')} rules={[{ required: true, message: t('validation.required') }]}>
                 <Input placeholder="https://nocodb-staging.company.com" />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item
                 name={['target', 'apiToken']}
-                label="API Token"
+                label={t('compare.apiToken')}
                 dependencies={[["target", "apiTokenSaved"]]}
                 rules={[
                   {
@@ -284,27 +309,33 @@ export function ImportExecutePage() {
                       const saved = !!form.getFieldValue(['target', 'apiTokenSaved'])
                       if (saved && !String(value ?? '').trim()) return
                       if (String(value ?? '').trim()) return
-                      throw new Error('API Token 必填')
+                      throw new Error(t('validation.apiTokenRequired'))
                     },
                   },
                 ]}
               >
-                <Input.Password placeholder={form.getFieldValue(['target', 'apiTokenSaved']) ? '已保存（不回显）' : 'xc-auth token'} />
+                <Input.Password
+                  placeholder={
+                    form.getFieldValue(['target', 'apiTokenSaved'])
+                      ? t('compare.apiTokenSaved')
+                      : t('compare.apiTokenPlaceholder')
+                  }
+                />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name={['target', 'baseId']} label="Base ID" rules={[{ required: true }]}>
-                <Input placeholder="例如 pRdVnZXPZgA" />
+              <Form.Item name={['target', 'baseId']} label={t('compare.baseId')} rules={[{ required: true, message: t('validation.required') }]}>
+                <Input placeholder={t('compare.baseIdPlaceholder')} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Alert
                 type="info"
                 showIcon
-                message="提示"
-                description="执行时后端会以这里填写的 baseUrl/baseId 为准，并尝试将导入文件中的 URL 自动重写到当前 target。"
+                message={t('common.tip')}
+                description={t('import.rewriteHint')}
               />
             </Col>
           </Row>
@@ -314,23 +345,23 @@ export function ImportExecutePage() {
       <Card
         title={
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <span>3) 步骤预览与执行</span>
+            <span>{t('import.step3')}</span>
             <Space wrap>
               <Button disabled={!plan} onClick={selectAll}>
-                全选
+                {t('import.selectAll')}
               </Button>
               <Button disabled={!plan} onClick={selectSafeOnly}>
-                仅选安全项
+                {t('import.selectSafeOnly')}
               </Button>
               <Button disabled={!plan} onClick={clearSelection}>
-                清空
+                {t('import.clear')}
               </Button>
               <Divider type="vertical" />
               <Button disabled={!plan} loading={loadingApply} onClick={() => apply(true)}>
-                Dry-run
+                {t('common.dryRun')}
               </Button>
               <Button danger disabled={!plan} loading={loadingApply} onClick={() => apply(false)}>
-                执行
+                {t('common.execute')}
               </Button>
             </Space>
           </div>
@@ -347,38 +378,38 @@ export function ImportExecutePage() {
           }}
           columns={[
             {
-              title: '危险',
+              title: t('common.danger'),
               dataIndex: 'danger',
               width: 70,
-              render: (v: boolean) => (v ? '是' : ''),
+              render: (v: boolean) => (v ? t('common.yes') : ''),
             },
-            { title: '步骤', dataIndex: 'title' },
-            { title: 'Method', dataIndex: ['request', 'method'], width: 90 },
-            { title: 'URL', dataIndex: ['request', 'url'] },
+            { title: t('common.step'), dataIndex: 'title' },
+            { title: t('common.method'), dataIndex: ['request', 'method'], width: 90 },
+            { title: t('common.url'), dataIndex: ['request', 'url'] },
           ]}
           pagination={{ pageSize: 20 }}
         />
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          说明：导入文件的请求头通常是 ***（已脱敏）。执行时后端会注入真实 token，并解析 URL 里的 {`{tableId}`} / {`{columnId}`} 占位符。
+          {t('import.note')}
         </Typography.Paragraph>
       </Card>
 
-      <Card title="执行结果" size="small" style={{ borderRadius: 8 }}>
+      <Card title={t('import.resultTitle')} size="small" style={{ borderRadius: 8 }}>
         {result ? (
           <Table
             size="small"
             rowKey="id"
             dataSource={result.results}
             columns={[
-              { title: 'Step ID', dataIndex: 'id', width: 260 },
+              { title: t('import.resultColumns.stepId'), dataIndex: 'id', width: 260 },
               {
-                title: 'OK',
+                title: t('import.resultColumns.ok'),
                 dataIndex: 'ok',
                 width: 80,
-                render: (v: boolean) => (v ? '是' : '否'),
+                render: (v: boolean) => (v ? t('common.yes') : t('common.no')),
               },
-              { title: 'HTTP', dataIndex: 'status', width: 90 },
-              { title: 'Error', dataIndex: 'error' },
+              { title: t('import.resultColumns.http'), dataIndex: 'status', width: 90 },
+              { title: t('import.resultColumns.error'), dataIndex: 'error' },
             ]}
             expandable={{
               expandedRowRender: (r) => (
@@ -389,7 +420,7 @@ export function ImportExecutePage() {
             pagination={{ pageSize: 20 }}
           />
         ) : (
-          <Typography.Text type="secondary">尚未执行</Typography.Text>
+          <Typography.Text type="secondary">{t('common.notExecuted')}</Typography.Text>
         )}
       </Card>
     </Space>

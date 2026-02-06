@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import { App } from './ui/App'
 import 'antd/dist/reset.css'
 
+// i18n (must be loaded before components)
+import './ui/i18n'
+
 // Open-source fonts (SIL OFL)
 import '@fontsource/inter/400.css'
 import '@fontsource/inter/600.css'

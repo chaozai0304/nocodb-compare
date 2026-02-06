@@ -4,6 +4,8 @@ import { CloudUploadOutlined, DiffOutlined, SettingOutlined, LogoutOutlined, Use
 import type { ThemeMode } from './theme'
 import { fetchJson } from './api'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { availableLanguages, languageLabels, setStoredLanguage, type LanguageCode, normalizeLanguage } from './i18n'
 
 const { Header, Sider, Content } = Layout
 
@@ -11,6 +13,7 @@ export function AppShell(props: { themeMode: ThemeMode; setThemeMode: (m: ThemeM
   const { token } = theme.useToken()
   const nav = useNavigate()
   const loc = useLocation()
+  const { t, i18n } = useTranslation()
 
   const selectedKey = loc.pathname.startsWith('/import') ? 'import' : 'compare'
 
@@ -53,9 +56,14 @@ export function AppShell(props: { themeMode: ThemeMode; setThemeMode: (m: ThemeM
       body: JSON.stringify(payload),
     })
     setUsername(r?.user?.username ?? username)
-    message.success('账号信息已更新')
+    message.success(t('auth.updated'))
     setOpenReset(false)
     resetForm.resetFields()
+  }
+
+  async function setLanguage(lang: LanguageCode) {
+    setStoredLanguage(lang)
+    await i18n.changeLanguage(lang)
   }
 
   return (
@@ -63,9 +71,9 @@ export function AppShell(props: { themeMode: ThemeMode; setThemeMode: (m: ThemeM
       <Sider width={220} style={{ background: token.colorBgContainer }}>
         <div style={{ padding: 16 }}>
           <Typography.Title level={4} style={{ margin: 0 }}>
-            NocoDB 升级平台
+            {t('app.title')}
           </Typography.Title>
-          <Typography.Text type="secondary">Schema 对比 · 计划 · 执行</Typography.Text>
+          <Typography.Text type="secondary">{t('app.subtitle')}</Typography.Text>
         </div>
         <Menu
           mode="inline"
@@ -74,13 +82,13 @@ export function AppShell(props: { themeMode: ThemeMode; setThemeMode: (m: ThemeM
             {
               key: 'compare',
               icon: <DiffOutlined />,
-              label: '对比升级',
+              label: t('nav.compare'),
               onClick: () => nav('/compare'),
             },
             {
               key: 'import',
               icon: <CloudUploadOutlined />,
-              label: '导入执行',
+              label: t('nav.import'),
               onClick: () => nav('/import'),
             },
           ]}
@@ -99,19 +107,31 @@ export function AppShell(props: { themeMode: ThemeMode; setThemeMode: (m: ThemeM
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
             <Typography.Text strong style={{ fontSize: 14 }}>
-              {selectedKey === 'compare' ? '对比与生成升级计划' : '导入升级计划并执行'}
+              {selectedKey === 'compare' ? t('header.compareTitle') : t('header.importTitle')}
             </Typography.Text>
             <Space size={8}>
-              <Typography.Text type="secondary">主题</Typography.Text>
+              <Typography.Text type="secondary">{t('header.theme')}</Typography.Text>
               <Select
                 size="small"
                 value={themeMode}
                 style={{ width: 120 }}
                 onChange={(v) => setThemeMode(v)}
                 options={[
-                  { value: 'ops', label: '运维' },
-                  { value: 'light', label: '浅色' },
+                  { value: 'ops', label: t('header.themeOps') },
+                  { value: 'light', label: t('header.themeLight') },
                 ]}
+              />
+
+              <Typography.Text type="secondary">{t('header.language')}</Typography.Text>
+              <Select
+                size="small"
+                value={normalizeLanguage(i18n.language) as LanguageCode}
+                style={{ width: 140 }}
+                onChange={(v) => void setLanguage(v)}
+                options={availableLanguages.map((code) => ({
+                  value: code,
+                  label: languageLabels[code] || code,
+                }))}
               />
 
               <Dropdown
@@ -121,20 +141,20 @@ export function AppShell(props: { themeMode: ThemeMode; setThemeMode: (m: ThemeM
                     {
                       key: 'reset',
                       icon: <SettingOutlined />,
-                      label: '修改用户名/密码',
+                      label: t('header.changeCredentials'),
                       onClick: () => setOpenReset(true),
                     },
                     {
                       key: 'logout',
                       icon: <LogoutOutlined />,
-                      label: '退出登录',
+                      label: t('header.logout'),
                       onClick: () => logout(),
                     },
                   ],
                 }}
               >
                 <Button size="small" icon={<UserOutlined />}>
-                  {username || '用户'}
+                  {username || t('header.user')}
                 </Button>
               </Dropdown>
             </Space>
@@ -149,32 +169,32 @@ export function AppShell(props: { themeMode: ThemeMode; setThemeMode: (m: ThemeM
       </Layout>
 
       <Modal
-        title="修改用户名/密码"
+        title={t('auth.resetTitle')}
         open={openReset}
         onCancel={() => {
           setOpenReset(false)
           resetForm.resetFields()
         }}
         onOk={() => resetCredentials()}
-        okText="保存"
-        cancelText="取消"
+        okText={t('auth.save')}
+        cancelText={t('auth.cancel')}
       >
         <Form form={resetForm} layout="vertical">
           <Form.Item
             name="currentPassword"
-            label="当前密码"
-            rules={[{ required: true, message: '请输入当前密码' }]}
+            label={t('auth.currentPassword')}
+            rules={[{ required: true, message: t('validation.currentPasswordRequired') }]}
           >
             <Input.Password />
           </Form.Item>
-          <Form.Item name="newUsername" label="新用户名（可选）">
-            <Input placeholder="不填则保持不变" />
+          <Form.Item name="newUsername" label={t('auth.newUsernameOptional')}>
+            <Input placeholder={t('auth.keepUnchanged')} />
           </Form.Item>
-          <Form.Item name="newPassword" label="新密码（可选）">
-            <Input.Password placeholder="不填则仅修改用户名" />
+          <Form.Item name="newPassword" label={t('auth.newPasswordOptional')}>
+            <Input.Password placeholder={t('auth.onlyChangeUsername')} />
           </Form.Item>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            提示：建议首次登录后立即修改默认密码。
+            {t('auth.resetTip')}
           </Typography.Paragraph>
         </Form>
       </Modal>

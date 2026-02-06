@@ -1,7 +1,9 @@
-import { Button, Card, Form, Input, Space, Tag, Typography, message, theme } from 'antd'
+import { Button, Card, Form, Input, Select, Space, Tag, Typography, message, theme } from 'antd'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { fetchJson } from '../api'
+import { useTranslation } from 'react-i18next'
+import { availableLanguages, languageLabels, normalizeLanguage, setStoredLanguage, type LanguageCode } from '../i18n'
 
 type LoginResp = { ok: boolean; user?: { username: string } }
 
@@ -14,6 +16,12 @@ export function LoginPage() {
   const state = (loc.state || {}) as LocState
   const [loading, setLoading] = useState(false)
   const { token } = theme.useToken()
+  const { t, i18n } = useTranslation()
+
+  async function setLanguage(lang: LanguageCode) {
+    setStoredLanguage(lang)
+    await i18n.changeLanguage(lang)
+  }
 
   async function login() {
     setLoading(true)
@@ -25,7 +33,7 @@ export function LoginPage() {
         body: JSON.stringify(v),
       })
       if (res.ok) {
-        message.success('登录成功')
+        message.success(t('auth.loginSuccess'))
         nav(state.from || '/compare', { replace: true })
       }
     } catch (e: any) {
@@ -158,10 +166,23 @@ export function LoginPage() {
               </Tag>
             </div>
 
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <Select
+                size="small"
+                value={normalizeLanguage(i18n.language) as LanguageCode}
+                style={{ width: 140 }}
+                onChange={(v) => void setLanguage(v)}
+                options={availableLanguages.map((code) => ({
+                  value: code,
+                  label: languageLabels[code] || code,
+                }))}
+              />
+            </div>
+
             <Typography.Title level={2} style={{ margin: 0, letterSpacing: 0.2 }}>
-            NocoDB 升级平台
-          </Typography.Title>
-            <Typography.Text type="secondary">Schema 对比 · 计划 · 执行</Typography.Text>
+              {t('app.title')}
+            </Typography.Title>
+            <Typography.Text type="secondary">{t('app.subtitle')}</Typography.Text>
           </Space>
         </div>
 
@@ -176,27 +197,32 @@ export function LoginPage() {
           <Space direction="vertical" size={14} style={{ width: '100%' }}>
             <div>
               <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 6 }}>
-                登录
+                {t('auth.login')}
               </Typography.Title>
               <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                请输入用户名与密码。首次启动默认账号可在服务器环境变量中配置（INIT_USERNAME/INIT_PASSWORD）。
+                {t('auth.loginHint')}
               </Typography.Paragraph>
             </div>
 
             <Form form={form} layout="vertical" onFinish={login}>
-              <Form.Item name="username" label="用户名" rules={[{ required: true }]}>
+              <Form.Item name="username" label={t('auth.username')} rules={[{ required: true, message: t('validation.required') }]}>
                 <Input autoFocus placeholder="admin" size="large" />
               </Form.Item>
-              <Form.Item name="password" label="密码" rules={[{ required: true }]}>
+              <Form.Item name="password" label={t('auth.password')} rules={[{ required: true, message: t('validation.required') }]}>
                 <Input.Password placeholder="••••••••" size="large" />
               </Form.Item>
               <Button type="primary" htmlType="submit" loading={loading} block size="large">
-                登录
+                {t('auth.login')}
               </Button>
             </Form>
 
             <Typography.Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
-              提示：生产环境请设置 <Typography.Text code>SESSION_SECRET</Typography.Text>，否则服务重启会让登录失效。
+              {t('auth.sessionSecretHint').split('SESSION_SECRET').map((part, idx, arr) => (
+                <span key={idx}>
+                  {part}
+                  {idx < arr.length - 1 ? <Typography.Text code>SESSION_SECRET</Typography.Text> : null}
+                </span>
+              ))}
             </Typography.Paragraph>
           </Space>
         </Card>
