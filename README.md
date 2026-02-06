@@ -124,5 +124,3 @@ This repository ignores `data/` and `apps/**/data/`.
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-<!-- Legacy config path removed -->
