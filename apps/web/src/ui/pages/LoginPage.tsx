@@ -161,9 +161,7 @@ export function LoginPage() {
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
           <Space direction="vertical" size={6} style={{ width: '100%' }}>
             <div>
-              <Tag color="geekblue" style={{ marginInlineEnd: 0, borderRadius: 999, paddingInline: 10 }}>
-                AI Ops Console
-              </Tag>
+             
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center' }}>
