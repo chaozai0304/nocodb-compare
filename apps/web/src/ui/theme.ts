@@ -20,6 +20,7 @@ export function getAntdThemeConfig(mode: ThemeMode): ThemeConfig {
     // 轻量主题也稍微“压白”，避免太刺眼
     return {
       token: {
+        fontFamily: "'Inter','Noto Sans SC',ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial",
         colorPrimary: '#1677ff',
         colorBgLayout: '#f5f7fb',
       },
@@ -30,6 +31,7 @@ export function getAntdThemeConfig(mode: ThemeMode): ThemeConfig {
   return {
     algorithm: antdTheme.darkAlgorithm,
     token: {
+      fontFamily: "'Inter','Noto Sans SC',ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial",
       colorPrimary: '#00b8d9', // cyan
       colorSuccess: '#36cfc9',
       colorWarning: '#faad14',
