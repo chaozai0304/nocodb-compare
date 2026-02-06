@@ -1,0 +1,15 @@
+services:
+  nocodb-compare:
+    build: .
+    image: nocodb-compare:latest
+    ports:
+      - "5175:5175"
+    environment:
+      PORT: "5175"
+      # 同源部署下无需 CORS；如需允许特定前端域名，可填逗号分隔：
+      # CORS_ORIGIN: "https://your-web.example.com"
+      SERVE_WEB: "1"
+      CONFIG_FILE: "/data/config.json"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
