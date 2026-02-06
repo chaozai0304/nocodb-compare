@@ -58,6 +58,15 @@ Vous pouvez définir :
 
 ---
 
+## Polices (open-source)
+
+L’UI web embarque des polices open-source (via `@fontsource/*`) :
+
+- Inter — SIL Open Font License 1.1
+- Noto Sans SC — SIL Open Font License 1.1
+
+---
+
 ## Licence
 
 MIT — voir [LICENSE](LICENSE).

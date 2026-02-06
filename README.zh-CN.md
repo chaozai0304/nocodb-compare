@@ -128,6 +128,15 @@
 
 ---
 
+## 字体（开源）
+
+Web 端打包内置开源字体（通过 `@fontsource/*` 引入）：
+
+- Inter — SIL Open Font License 1.1
+- Noto Sans SC — SIL Open Font License 1.1
+
+---
+
 ## License
 
 MIT，见 [LICENSE](LICENSE)。

@@ -121,6 +121,15 @@ This repository ignores `data/` and `apps/**/data/`.
 
 ---
 
+## Fonts
+
+The web UI bundles open-source fonts (via `@fontsource/*`):
+
+- Inter — SIL Open Font License 1.1
+- Noto Sans SC — SIL Open Font License 1.1
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
