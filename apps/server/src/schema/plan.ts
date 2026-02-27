@@ -65,7 +65,12 @@ export function buildPlan(
 
       const body: any = {
         title: t.table.title,
-        table_name: safeDbName(t.table.table_name || t.table.title, 't'),
+        // 保持与 source schema 一致：优先使用 source 的 table_name。
+        // 之前这里用 safeDbName 会把例如 "Table-新增" 变成 "table"，
+        // 导致与现有表别名冲突（DUPLICATE_ALIAS），并造成“差异摘要 vs 导出计划”不一致。
+        table_name: (t.table.table_name && String(t.table.table_name).trim())
+          ? t.table.table_name
+          : safeDbName(t.table.title, 't'),
         // NocoDB v2 create-table schema 要求 columns 必填
         columns,
       }
@@ -170,7 +175,11 @@ function columnReqFromSource(col: { title: string; column_name?: string; uidt?: 
   // 这里尽量用“最常用且比较稳”的字段。
   const body: any = {
     title: col.title,
-    column_name: safeDbName(col.column_name || col.title, 'c'),
+    // 与 source 保持一致：优先使用 source 的 column_name。
+    // 否则才根据 title 生成一个“安全名”（避免空/非法）。
+    column_name: (col.column_name && String(col.column_name).trim())
+      ? col.column_name
+      : safeDbName(col.title, 'c'),
     uidt: col.uidt,
     dt: col.dt,
     rqd: col.rqd,
